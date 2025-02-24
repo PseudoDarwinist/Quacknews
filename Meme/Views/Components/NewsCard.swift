@@ -2,7 +2,6 @@ import SwiftUI
 
 struct NewsCard: View {
     let newsItem: NewsItem
-    @State private var isPressed = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -73,16 +72,6 @@ struct NewsCard: View {
                 .fill(Color(UIColor.systemBackground))
                 .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
         )
-        .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isPressed)
-        .onTapGesture {
-            withAnimation {
-                isPressed = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    isPressed = false
-                }
-            }
-        }
     }
     
     private var categoryColor: Color {

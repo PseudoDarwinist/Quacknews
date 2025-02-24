@@ -55,7 +55,10 @@ struct HomeFeedView: View {
                                     NewsCard(newsItem: newsItem)
                                         .transition(.opacity.combined(with: .scale))
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(PlainButtonStyle())
+                                .simultaneousGesture(TapGesture().onEnded {
+                                    logger.debug("Tapped news item: \(newsItem.title)")
+                                })
                             }
                         }
                         .padding(.horizontal)
