@@ -46,7 +46,7 @@ class RedditService {
     
     // Major news subreddits mapped to categories
     private let newsSubreddits = [
-        "sports+Cricket": NewsItem.NewsCategory.sports,        // Combined sports news
+        "Cricket+CricketBanter+sports": NewsItem.NewsCategory.sports,  // Prioritize cricket news
         "spacex+tesla": NewsItem.NewsCategory.elonMusk,      // Elon/Tesla/SpaceX news
         "movies+television": NewsItem.NewsCategory.entertainment,  // Entertainment news
         "advertising": NewsItem.NewsCategory.ads,        // Ad industry news
@@ -55,7 +55,12 @@ class RedditService {
     
     // Meme subreddits with high engagement
     private let memeSubreddits = [
-        NewsItem.NewsCategory.sports: ["CricketShitpost", "sportsshitpost"],
+        NewsItem.NewsCategory.sports: [
+            "CricketShitpost",         // Primary cricket memes
+            "cricketitaly",            // More cricket memes
+            "CricketMemes",            // Additional cricket memes
+            "sportsshitpost"           // General sports memes as backup
+        ],
         NewsItem.NewsCategory.elonMusk: ["SpaceXMasterrace", "elonmemes"],
         NewsItem.NewsCategory.entertainment: ["moviememes", "PrequelMemes"],
         NewsItem.NewsCategory.ads: ["CommercialMemes", "SuperbOwl"],
@@ -63,54 +68,57 @@ class RedditService {
     ]
     
     func fetchNews() async throws -> [NewsItem] {
-        logger.info("Starting to fetch news from Reddit")
+        // Only log start of major operations
+        logger.info("Fetching news from Reddit")
         var allNews: [NewsItem] = []
         var lastError: Error?
         
-        for (subreddit, category) in newsSubreddits {
-            logger.debug("Fetching from subreddit: \(subreddit) for category: \(category.rawValue)")
-            
-            do {
-                // URL encode the subreddit string
-                let encodedSubreddit = subreddit.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? subreddit
-                let url = URL(string: "\(baseURL)/r/\(encodedSubreddit)/hot.json?limit=3")!
-                
-                var request = URLRequest(url: url)
-                request.setValue("QuackNews/1.0", forHTTPHeaderField: "User-Agent")
-                request.timeoutInterval = 30
-                
-                let (data, response) = try await session.data(for: request)
-                
-                if let httpResponse = response as? HTTPURLResponse {
-                    logger.debug("Response status code: \(httpResponse.statusCode) for \(subreddit)")
-                    
-                    guard (200...299).contains(httpResponse.statusCode) else {
-                        logger.error("HTTP error \(httpResponse.statusCode) for \(subreddit)")
-                        continue
+        // Create async tasks for parallel fetching
+        async let newsTaskResults = withThrowingTaskGroup(of: [NewsItem].self) { group in
+            for (subreddit, category) in newsSubreddits {
+                group.addTask {
+                    do {
+                        let encodedSubreddit = subreddit.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? subreddit
+                        let url = URL(string: "\(self.baseURL)/r/\(encodedSubreddit)/hot.json?limit=3")!
+                        
+                        var request = URLRequest(url: url)
+                        request.setValue("QuackNews/1.0", forHTTPHeaderField: "User-Agent")
+                        request.timeoutInterval = 30
+                        
+                        let (data, response) = try await self.session.data(for: request)
+                        
+                        if let httpResponse = response as? HTTPURLResponse,
+                           !(200...299).contains(httpResponse.statusCode) {
+                            logger.error("HTTP \(httpResponse.statusCode) for \(subreddit)")
+                            return []
+                        }
+                        
+                        let listing = try JSONDecoder().decode(RedditListing.self, from: data)
+                        return try await self.processNewsItems(listing.data.children, category: category)
+                    } catch {
+                        logger.error("Failed fetching \(subreddit): \(error.localizedDescription)")
+                        return []
                     }
                 }
                 
-                let listing = try JSONDecoder().decode(RedditListing.self, from: data)
-                logger.debug("Successfully decoded \(listing.data.children.count) posts from \(subreddit)")
-                
-                if let news = try? await processNewsItems(listing.data.children, category: category) {
-                    allNews.append(contentsOf: news)
-                    logger.debug("Processed \(news.count) news items from \(subreddit)")
-                }
-            } catch {
-                logger.error("Error fetching from \(subreddit): \(error.localizedDescription)")
-                lastError = error
-                continue // Skip this subreddit but continue with others
+                // Add small delay between task creation to avoid rate limits
+                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
             }
             
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            var results: [NewsItem] = []
+            for try await items in group {
+                results.append(contentsOf: items)
+            }
+            return results
         }
         
-        logger.info("Completed news fetch with \(allNews.count) total items")
+        // Await all results
+        allNews = try await newsTaskResults
         
-        // Only throw if we have no news items at all
-        if allNews.isEmpty, let error = lastError {
-            throw error
+        logger.info("Completed news fetch with \(allNews.count) items")
+        
+        if allNews.isEmpty {
+            throw NSError(domain: "RedditService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No news items found"])
         }
         
         return allNews.sorted { $0.publishedDate > $1.publishedDate }
@@ -180,13 +188,27 @@ class RedditService {
     }
     
     private func isMajorNews(title: String, category: NewsItem.NewsCategory) -> Bool {
-        // Convert title to lowercase for case-insensitive matching
         let titleLower = title.lowercased()
         
         let keywords: Set<String>
         switch category {
         case .sports:
-            keywords = ["match", "win", "final", "series", "cup", "tournament", "champion", "record", "victory", "team", "score", "india", "pakistan", "australia", "england"]
+            keywords = [
+                // Cricket-specific keywords
+                "icc", "champions trophy", "world cup", "t20", "odi", "test match",
+                "india", "pakistan", "australia", "england",
+                "kohli", "babar", "rohit", "gill", "siraj",
+                "wicket", "century", "batting", "bowling",
+                // General cricket terms
+                "cricket", "match", "series", "tournament",
+                "runs", "score", "innings", "partnership",
+                // Match outcomes
+                "win", "defeat", "victory", "lost", "beat",
+                // Rivalry terms
+                "rivalry", "clash", "versus", "vs",
+                // General sports terms as fallback
+                "champion", "record", "team"
+            ]
         case .elonMusk:
             keywords = ["launch", "tesla", "spacex", "starship", "twitter", "x", "cybertruck", "musk", "rocket", "mars", "satellite", "starlink"]
         case .entertainment:
@@ -213,60 +235,66 @@ class RedditService {
     private func fetchMemesForCategory(_ category: NewsItem.NewsCategory, limit: Int, keywords: [String]) async throws -> [Meme] {
         guard let subreddits = memeSubreddits[category] else { return [] }
         
-        var allMemes: [Meme] = []
-        var errors: [Error] = []
-        
-        for subreddit in subreddits {
-            do {
-                let encodedSubreddit = subreddit.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? subreddit
-                let url = URL(string: "\(baseURL)/r/\(encodedSubreddit)/hot.json?limit=10")!
-                
-                var request = URLRequest(url: url)
-                request.setValue("QuackNews/1.0", forHTTPHeaderField: "User-Agent")
-                request.timeoutInterval = 30
-                
-                let (data, response) = try await session.data(for: request)
-                
-                if let httpResponse = response as? HTTPURLResponse {
-                    guard (200...299).contains(httpResponse.statusCode) else {
-                        logger.error("HTTP error \(httpResponse.statusCode) for meme subreddit \(subreddit)")
-                        continue
+        // Fetch memes in parallel
+        async let memesResults = withThrowingTaskGroup(of: [Meme].self) { group in
+            for subreddit in subreddits {
+                group.addTask {
+                    do {
+                        let encodedSubreddit = subreddit.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? subreddit
+                        let url = URL(string: "\(self.baseURL)/r/\(encodedSubreddit)/hot.json?limit=10")!
+                        
+                        var request = URLRequest(url: url)
+                        request.setValue("QuackNews/1.0", forHTTPHeaderField: "User-Agent")
+                        request.timeoutInterval = 30
+                        
+                        let (data, response) = try await self.session.data(for: request)
+                        
+                        if let httpResponse = response as? HTTPURLResponse,
+                           !(200...299).contains(httpResponse.statusCode) {
+                            return []
+                        }
+                        
+                        let listing = try JSONDecoder().decode(RedditListing.self, from: data)
+                        
+                        return listing.data.children.compactMap { post -> Meme? in
+                            guard let imageURL = self.getBestImageURL(from: post.data),
+                                  self.isRelevantMeme(title: post.data.title, keywords: keywords) else { return nil }
+                            
+                            return Meme(
+                                imageURL: imageURL,
+                                source: .reddit,
+                                title: post.data.title,
+                                redditURL: URL(string: "\(self.baseURL)\(post.data.permalink)")!
+                            )
+                        }
+                    } catch {
+                        return []
                     }
                 }
                 
-                let listing = try JSONDecoder().decode(RedditListing.self, from: data)
-                
-                let memes = listing.data.children.compactMap { post -> Meme? in
-                    guard let imageURL = getBestImageURL(from: post.data),
-                          isRelevantMeme(title: post.data.title, keywords: keywords) else { return nil }
-                    
-                    return Meme(
-                        imageURL: imageURL,
-                        source: .reddit,
-                        title: post.data.title,
-                        redditURL: URL(string: "\(baseURL)\(post.data.permalink)")!
-                    )
-                }
-                
-                allMemes.append(contentsOf: memes)
-                if allMemes.count >= limit { break }
-                
-            } catch {
-                logger.error("Error fetching memes from \(subreddit): \(error.localizedDescription)")
-                errors.append(error)
-                continue // Skip this subreddit but continue with others
+                // Small delay between task creation
+                try await Task.sleep(nanoseconds: 300_000_000) // 0.3 second delay
             }
             
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            var results: [Meme] = []
+            for try await memes in group {
+                results.append(contentsOf: memes)
+                if results.count >= limit { break }
+            }
+            return Array(results.prefix(limit))
         }
         
-        // Return whatever memes we found, even if some failed
-        return Array(allMemes.prefix(limit))
+        return try await memesResults
     }
     
     private func isRelevantMeme(title: String, keywords: [String]) -> Bool {
         let titleLower = title.lowercased()
-        return keywords.contains { titleLower.contains($0) }
+        
+        // For cricket/sports memes, also check for common cricket-related terms
+        let cricketTerms = ["india", "pakistan", "cricket", "icc", "match", "kohli", "babar"]
+        
+        return keywords.contains { titleLower.contains($0) } ||
+               (titleLower.contains("cricket") && cricketTerms.contains { titleLower.contains($0) })
     }
     
     private func cleanupText(_ text: String) -> String {
