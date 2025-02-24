@@ -1,4 +1,7 @@
 import SwiftUI
+import OSLog
+
+private let logger = Logger(subsystem: "com.quacknews.app", category: "HomeFeedView")
 
 struct HomeFeedView: View {
     @State private var selectedCategory: NewsItem.NewsCategory?
@@ -11,26 +14,33 @@ struct HomeFeedView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
+            ScrollView(.vertical) {
                 VStack(spacing: 16) {
                     // Category Selector
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
-                            CategoryButton(title: "All", isSelected: selectedCategory == nil) {
-                                withAnimation(animation) {
-                                    selectedCategory = nil
+                            CategoryButton(
+                                title: "All",
+                                isSelected: selectedCategory == nil,
+                                action: {
+                                    withAnimation(animation) {
+                                        logger.debug("Category selected: All")
+                                        selectedCategory = nil
+                                    }
                                 }
-                            }
+                            )
                             
                             ForEach(NewsItem.NewsCategory.allCases, id: \.self) { category in
                                 CategoryButton(
                                     title: category.rawValue,
-                                    isSelected: selectedCategory == category
-                                ) {
-                                    withAnimation(animation) {
-                                        selectedCategory = category
+                                    isSelected: selectedCategory == category,
+                                    action: {
+                                        withAnimation(animation) {
+                                            logger.debug("Category selected: \(category.rawValue)")
+                                            selectedCategory = category
+                                        }
                                     }
-                                }
+                                )
                             }
                         }
                         .padding(.horizontal)
@@ -41,9 +51,7 @@ struct HomeFeedView: View {
                         // News Cards
                         LazyVStack(spacing: 20) {
                             ForEach(filteredNews) { newsItem in
-                                NavigationLink {
-                                    NewsDetailView(newsItem: newsItem)
-                                } label: {
+                                NavigationLink(destination: NewsDetailView(newsItem: newsItem)) {
                                     NewsCard(newsItem: newsItem)
                                         .transition(.opacity.combined(with: .scale))
                                 }
@@ -52,19 +60,16 @@ struct HomeFeedView: View {
                         }
                         .padding(.horizontal)
                     } else {
-                        ContentUnavailableView(
-                            label: {
-                                Label(
-                                    errorMessage ?? "Loading News...",
-                                    systemImage: errorMessage != nil ? "exclamationmark.triangle" : "newspaper"
-                                )
-                            },
-                            description: {
-                                if errorMessage != nil {
-                                    Text("Pull to refresh and try again")
-                                }
+                        ContentUnavailableView {
+                            Label(
+                                errorMessage ?? "Loading News...",
+                                systemImage: errorMessage != nil ? "exclamationmark.triangle" : "newspaper"
+                            )
+                        } description: {
+                            if errorMessage != nil {
+                                Text("Pull to refresh and try again")
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -83,10 +88,12 @@ struct HomeFeedView: View {
                 }
             }
             .refreshable {
+                logger.debug("Manual refresh triggered")
                 await refreshContent()
             }
             .task {
                 if newsItems.isEmpty {
+                    logger.debug("Initial content load")
                     await refreshContent()
                 }
             }
@@ -94,17 +101,27 @@ struct HomeFeedView: View {
     }
     
     private var filteredNews: [NewsItem] {
-        guard let selectedCategory = selectedCategory else { return newsItems }
-        return newsItems.filter { $0.category == selectedCategory }
+        guard let selectedCategory = selectedCategory else { 
+            logger.debug("Showing all news items: \(newsItems.count)")
+            return newsItems 
+        }
+        let filtered = newsItems.filter { $0.category == selectedCategory }
+        logger.debug("Filtered news items for \(selectedCategory.rawValue): \(filtered.count)")
+        return filtered
     }
     
     private func refreshContent() async {
+        logger.info("Starting content refresh")
         isRefreshing = true
         errorMessage = nil
         
         do {
+            let startTime = Date()
             newsItems = try await RedditService.shared.fetchNews()
+            let duration = Date().timeIntervalSince(startTime)
+            logger.info("Content refresh completed in \(String(format: "%.2f", duration))s with \(newsItems.count) items")
         } catch {
+            logger.error("Content refresh failed: \(error.localizedDescription)")
             errorMessage = "Failed to load news: \(error.localizedDescription)"
         }
         
