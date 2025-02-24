@@ -4,6 +4,8 @@ struct NewsDetailView: View {
     let newsItem: NewsItem
     @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedMeme: Meme?
+    @State private var showingMemeDetail = false
     
     private let columns = [
         GridItem(.flexible()),
@@ -72,10 +74,11 @@ struct NewsDetailView: View {
                             
                             LazyVGrid(columns: columns, spacing: 16) {
                                 ForEach(newsItem.relatedMemes) { meme in
-                                    Link(destination: meme.redditURL) {
-                                        MemeCell(meme: meme)
-                                    }
-                                    .buttonStyle(.plain)
+                                    MemeCell(meme: meme)
+                                        .onTapGesture {
+                                            selectedMeme = meme
+                                            showingMemeDetail = true
+                                        }
                                 }
                             }
                         }
@@ -98,6 +101,11 @@ struct NewsDetailView: View {
                 )
             }
         }
+        .sheet(isPresented: $showingMemeDetail, content: {
+            if let meme = selectedMeme {
+                MemeDetailView(meme: meme)
+            }
+        })
     }
     
     private var categoryColor: Color {
@@ -120,7 +128,7 @@ struct MemeCell: View {
     let meme: Meme
     
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 8) {
             AsyncImage(url: meme.imageURL) { phase in
                 switch phase {
                 case .empty:
@@ -144,17 +152,81 @@ struct MemeCell: View {
             }
             .frame(height: 150)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-            )
+            .shadow(radius: 2)
             
             if let title = meme.title {
                 Text(title)
                     .font(.caption)
                     .lineLimit(2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.primary)
                     .padding(.horizontal, 4)
+            }
+        }
+    }
+}
+
+struct MemeDetailView: View {
+    let meme: Meme
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 16) {
+                    AsyncImage(url: meme.imageURL) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        case .failure:
+                            Image(systemName: "photo")
+                                .foregroundColor(.gray)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    
+                    if let title = meme.title {
+                        Text(title)
+                            .font(.headline)
+                            .multilineTextAlignment(.center)
+                    }
+                    
+                    Button(action: {
+                        openURL(meme.redditURL)
+                    }) {
+                        Label("View on Reddit", systemImage: "link")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                    }
+                }
+                .padding()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Meme")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarLeading) {
+                    ShareLink(
+                        item: meme.imageURL,
+                        subject: Text(meme.title ?? "Shared Meme"),
+                        message: Text("Check out this meme!")
+                    )
+                }
             }
         }
     }

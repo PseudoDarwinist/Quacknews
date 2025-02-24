@@ -25,6 +25,9 @@ struct RedditPostData: Codable {
     let subreddit: String
     let permalink: String
     let preview: Preview?
+    let over_18: Bool
+    let is_video: Bool
+    let post_hint: String?
     
     struct Preview: Codable {
         let images: [Image]
@@ -257,14 +260,22 @@ class RedditService {
                         let listing = try JSONDecoder().decode(RedditListing.self, from: data)
                         
                         return listing.data.children.compactMap { post -> Meme? in
-                            guard let imageURL = self.getBestImageURL(from: post.data),
-                                  self.isRelevantMeme(title: post.data.title, keywords: keywords) else { return nil }
+                            let postData = post.data
+                            
+                            // Skip NSFW, videos, and non-image content
+                            guard !postData.over_18,
+                                  !postData.is_video,
+                                  postData.post_hint == "image",
+                                  let imageURL = self.getBestImageURL(from: postData),
+                                  self.isRelevantMeme(title: postData.title, keywords: keywords) else { 
+                                return nil 
+                            }
                             
                             return Meme(
                                 imageURL: imageURL,
                                 source: .reddit,
-                                title: post.data.title,
-                                redditURL: URL(string: "\(self.baseURL)\(post.data.permalink)")!
+                                title: postData.title,
+                                redditURL: URL(string: "\(self.baseURL)\(postData.permalink)")!
                             )
                         }
                     } catch {
