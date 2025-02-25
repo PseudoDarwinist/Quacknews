@@ -52,13 +52,14 @@ struct NewsCard: View {
                 Text(newsItem.title)
                     .font(.headline)
                     .fontWeight(.bold)
-                    .lineLimit(3)
+                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 
-                Text(newsItem.summary)
+                Text(formattedSummary)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 // Time and Meme Count
                 HStack {
@@ -77,6 +78,24 @@ struct NewsCard: View {
                 .fill(Color(UIColor.systemBackground))
                 .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
         )
+    }
+    
+    private var formattedSummary: String {
+        // Clean up the summary text for better display
+        let summary = newsItem.summary
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // If summary is too long, truncate it
+        if summary.count > 120 {
+            let endIndex = summary.index(summary.startIndex, offsetBy: min(120, summary.count))
+            return String(summary[..<endIndex]) + "..."
+        }
+        return summary
     }
     
     private var categoryColor: Color {

@@ -49,11 +49,11 @@ class RedditService {
     
     // Major news subreddits mapped to categories
     private let newsSubreddits = [
-        "Cricket+CricketBanter+sports": NewsItem.NewsCategory.sports,  // Prioritize cricket news
-        "spacex+tesla": NewsItem.NewsCategory.elonMusk,      // Elon/Tesla/SpaceX news
-        "movies+television": NewsItem.NewsCategory.entertainment,  // Entertainment news
-        "advertising": NewsItem.NewsCategory.ads,        // Ad industry news
-        "worldnews+news": NewsItem.NewsCategory.politics    // World politics
+        "Cricket+CricketBanter+sports+IndianCricketTeam+PakCricket": NewsItem.NewsCategory.sports,  // Expanded cricket sources
+        "spacex+tesla+elonmusk+teslainvestorsclub+SpaceXLounge": NewsItem.NewsCategory.elonMusk,      // More Elon/Tesla/SpaceX sources
+        "movies+television+bollywood+BollywoodGossip+entertainment": NewsItem.NewsCategory.entertainment,  // Added Bollywood
+        "advertising+adporn+socialmedia+DigitalMarketing": NewsItem.NewsCategory.ads,        // Expanded ad industry
+        "worldnews+news+politics+IndiaNews+PakistanNews": NewsItem.NewsCategory.politics    // Added regional news
     ]
     
     // Meme subreddits with high engagement
@@ -62,12 +62,37 @@ class RedditService {
             "CricketShitpost",         // Primary cricket memes
             "cricketitaly",            // More cricket memes
             "CricketMemes",            // Additional cricket memes
-            "sportsshitpost"           // General sports memes as backup
+            "sportsshitpost",          // General sports memes
+            "sportsmemes",             // More sports humor
+            "cricketfunny"             // Cricket humor
         ],
-        NewsItem.NewsCategory.elonMusk: ["SpaceXMasterrace", "elonmemes"],
-        NewsItem.NewsCategory.entertainment: ["moviememes", "PrequelMemes"],
-        NewsItem.NewsCategory.ads: ["CommercialMemes", "SuperbOwl"],
-        NewsItem.NewsCategory.politics: ["PoliticalMemes", "worldpoliticsmemes"]
+        NewsItem.NewsCategory.elonMusk: [
+            "SpaceXMasterrace", 
+            "elonmemes", 
+            "EnoughMuskSpam",          // Critical memes about Elon
+            "wallstreetbets"           // Often has Tesla/Elon memes
+        ],
+        NewsItem.NewsCategory.entertainment: [
+            "moviememes", 
+            "PrequelMemes", 
+            "BollywoodMemes",          // Bollywood specific memes
+            "bollywoodrealism",        // Funny Bollywood scenes
+            "DankIndianMemes",         // Indian entertainment memes
+            "terriblefacebookmemes"    // So bad they're good
+        ],
+        NewsItem.NewsCategory.ads: [
+            "CommercialMemes", 
+            "SuperbOwl",               // Super Bowl ads
+            "FellowKids",              // Cringy ad attempts
+            "CorporateFacepalm"        // Bad corporate messaging
+        ],
+        NewsItem.NewsCategory.politics: [
+            "PoliticalMemes", 
+            "worldpoliticsmemes",
+            "IndianDankMemes",         // Indian political memes
+            "PoliticalHumor",          // US-focused political humor
+            "PropagandaPosters"        // Historical and modern propaganda
+        ]
     ]
     
     func fetchNews() async throws -> [NewsItem] {
@@ -197,35 +222,74 @@ class RedditService {
         switch category {
         case .sports:
             keywords = [
-                // Cricket-specific keywords
-                "icc", "champions trophy", "world cup", "t20", "odi", "test match",
-                "india", "pakistan", "australia", "england",
-                "kohli", "babar", "rohit", "gill", "siraj",
-                "wicket", "century", "batting", "bowling",
-                // General cricket terms
-                "cricket", "match", "series", "tournament",
-                "runs", "score", "innings", "partnership",
-                // Match outcomes
-                "win", "defeat", "victory", "lost", "beat",
-                // Rivalry terms
-                "rivalry", "clash", "versus", "vs",
-                // General sports terms as fallback
-                "champion", "record", "team"
+                // Cricket-specific controversial/trending keywords
+                "controversy", "dispute", "argument", "fight", "clash", "tension",
+                "rivalry", "india vs pakistan", "ashes", "sledging", "cheating",
+                "drs", "umpire decision", "icc", "champions trophy", "world cup",
+                // Player controversies
+                "kohli", "babar", "dhoni", "warner", "smith", "stokes",
+                // Match drama
+                "last ball", "thriller", "upset", "underdog", "comeback",
+                "record", "historic", "banned", "suspended", "fined",
+                // General cricket terms with controversy potential
+                "cricket", "match fixing", "betting", "scandal", "allegations"
             ]
         case .elonMusk:
-            keywords = ["launch", "tesla", "spacex", "starship", "twitter", "x", "cybertruck", "musk", "rocket", "mars", "satellite", "starlink"]
+            keywords = [
+                "controversy", "twitter", "x", "takeover", "fired", "lawsuit",
+                "tesla crash", "autopilot", "stock", "plunge", "surge", 
+                "spacex explosion", "starship", "mars", "neuralink", "brain chip",
+                "ai", "artificial intelligence", "warning", "threat", "doge", 
+                "cryptocurrency", "sec", "investigation", "boring company",
+                "hyperloop", "failed", "delayed", "promise", "delivery"
+            ]
         case .entertainment:
-            keywords = ["oscar", "box office", "marvel", "star wars", "record", "award", "movie", "film", "premiere", "director", "actor", "release"]
+            keywords = [
+                "controversy", "scandal", "divorce", "affair", "leaked", "backlash",
+                "criticized", "box office bomb", "flop", "disaster", "oscar snub",
+                "racist", "sexist", "inappropriate", "canceled", "recast",
+                "remake", "reboot", "sequel", "prequel", "franchise",
+                "marvel", "dc", "disney", "netflix", "streaming war",
+                "record breaking", "highest grossing", "banned", "censored",
+                "bollywood", "hollywood", "viral", "trending"
+            ]
         case .ads:
-            keywords = ["super bowl", "commercial", "campaign", "advertisement", "marketing", "brand", "viral", "agency", "creative"]
+            keywords = [
+                "controversy", "offensive", "backlash", "pulled", "banned",
+                "super bowl", "viral", "campaign", "backfired", "tone deaf",
+                "insensitive", "boycott", "protest", "criticism", "apology",
+                "expensive", "record", "celebrity", "endorsement", "dropped",
+                "social media", "reaction", "trending", "meme", "parody"
+            ]
         case .politics:
-            keywords = ["election", "president", "minister", "crisis", "war", "peace", "treaty", "vote", "government", "leader", "congress", "parliament"]
+            keywords = [
+                "controversy", "scandal", "corruption", "protest", "riot",
+                "election", "fraud", "vote", "democracy", "authoritarian",
+                "dictator", "president", "prime minister", "resign", "impeach",
+                "investigation", "leaked", "documents", "classified", "secret",
+                "war", "conflict", "tension", "sanctions", "nuclear",
+                "climate", "crisis", "emergency", "disaster", "policy",
+                "supreme court", "ruling", "overturned", "constitutional",
+                "rights", "freedom", "censorship", "banned", "illegal"
+            ]
         }
         
         // Check if any keyword is present in the title
-        return keywords.contains { keyword in
-            titleLower.contains(keyword.lowercased())
+        for keyword in keywords {
+            if titleLower.contains(keyword.lowercased()) {
+                return true
+            }
         }
+        
+        // Additional check for trending indicators
+        let trendingIndicators = ["breaking", "just in", "trending", "viral", "exclusive", "shocking", "controversial"]
+        for indicator in trendingIndicators {
+            if titleLower.contains(indicator) {
+                return true
+            }
+        }
+        
+        return false
     }
     
     private func getKeywords(from title: String) -> [String] {
@@ -301,26 +365,125 @@ class RedditService {
     private func isRelevantMeme(title: String, keywords: [String]) -> Bool {
         let titleLower = title.lowercased()
         
-        // For cricket/sports memes, also check for common cricket-related terms
-        let cricketTerms = ["india", "pakistan", "cricket", "icc", "match", "kohli", "babar"]
+        // Check for humor indicators in the title
+        let humorIndicators = [
+            "funny", "hilarious", "lol", "rofl", "lmao", "meme", "joke", 
+            "humor", "comedy", "parody", "satire", "troll", "epic fail",
+            "when you", "that moment when", "be like", "meanwhile", "plot twist"
+        ]
         
-        return keywords.contains { titleLower.contains($0) } ||
-               (titleLower.contains("cricket") && cricketTerms.contains { titleLower.contains($0) })
+        // Category-specific humor terms
+        let cricketHumor = [
+            "india", "pakistan", "cricket", "icc", "match", "kohli", "babar",
+            "dhoni", "rohit", "wicket", "bowled", "run out", "catch", "dropped",
+            "rain", "drs", "umpire", "review", "sledging", "celebration"
+        ]
+        
+        let elonHumor = [
+            "elon", "musk", "tesla", "spacex", "twitter", "x", "doge", 
+            "mars", "rocket", "cybertruck", "neuralink", "boring"
+        ]
+        
+        let entertainmentHumor = [
+            "movie", "actor", "actress", "director", "hollywood", "bollywood",
+            "oscar", "award", "red carpet", "celebrity", "star", "flop", "hit",
+            "marvel", "dc", "disney", "netflix", "amazon", "streaming"
+        ]
+        
+        // Check if title contains any humor indicators
+        let hasHumorIndicator = humorIndicators.contains { titleLower.contains($0) }
+        
+        // Check if title contains any of the original keywords
+        let hasKeyword = keywords.contains { keyword in 
+            titleLower.contains(keyword.lowercased())
+        }
+        
+        // Check for category-specific humor terms
+        let hasCricketHumor = titleLower.contains("cricket") && cricketHumor.contains { titleLower.contains($0) }
+        let hasElonHumor = (titleLower.contains("elon") || titleLower.contains("musk")) && elonHumor.contains { titleLower.contains($0) }
+        let hasEntertainmentHumor = (titleLower.contains("movie") || titleLower.contains("film")) && entertainmentHumor.contains { titleLower.contains($0) }
+        
+        // Prioritize memes that have both humor indicators and relevant keywords
+        return (hasHumorIndicator && hasKeyword) || 
+               hasCricketHumor || 
+               hasElonHumor || 
+               hasEntertainmentHumor ||
+               hasKeyword
     }
     
     private func cleanupText(_ text: String) -> String {
         if text.isEmpty {
-            return "Click to read more on Reddit..."
+            return "Tap to read more..."
         }
         
-        // Limit summary length to 250 characters
-        let cleanText = text
-            .replacingOccurrences(of: "\n\n+", with: "\n\n", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // Start with the original text
+        var cleanText = text
         
-        if cleanText.count > 250 {
-            return String(cleanText.prefix(247)) + "..."
+        // Remove markdown links [text](url)
+        cleanText = cleanText.replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression)
+        
+        // Remove URLs
+        cleanText = cleanText.replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
+        
+        // Remove Reddit formatting artifacts
+        cleanText = cleanText.replacingOccurrences(of: "&amp;", with: "&")
+        cleanText = cleanText.replacingOccurrences(of: "&lt;", with: "<")
+        cleanText = cleanText.replacingOccurrences(of: "&gt;", with: ">")
+        cleanText = cleanText.replacingOccurrences(of: "&nbsp;", with: " ")
+        
+        // Remove markdown headers (# Header)
+        cleanText = cleanText.replacingOccurrences(of: #"^#+\s+"#, with: "", options: .regularExpression)
+        cleanText = cleanText.replacingOccurrences(of: #"\n#+\s+"#, with: " ", options: .regularExpression)
+        
+        // Remove markdown bold/italic
+        cleanText = cleanText.replacingOccurrences(of: #"\*\*([^*]+)\*\*"#, with: "$1", options: .regularExpression)
+        cleanText = cleanText.replacingOccurrences(of: #"\*([^*]+)\*"#, with: "$1", options: .regularExpression)
+        cleanText = cleanText.replacingOccurrences(of: #"__([^_]+)__"#, with: "$1", options: .regularExpression)
+        cleanText = cleanText.replacingOccurrences(of: #"_([^_]+)_"#, with: "$1", options: .regularExpression)
+        
+        // Remove markdown quotes
+        cleanText = cleanText.replacingOccurrences(of: #"^>\s+"#, with: "", options: .regularExpression)
+        cleanText = cleanText.replacingOccurrences(of: #"\n>\s+"#, with: " ", options: .regularExpression)
+        
+        // Remove markdown lists
+        cleanText = cleanText.replacingOccurrences(of: #"\n\s*[-*+]\s+"#, with: " ", options: .regularExpression)
+        cleanText = cleanText.replacingOccurrences(of: #"^\s*[-*+]\s+"#, with: "", options: .regularExpression)
+        
+        // Remove numbered lists
+        cleanText = cleanText.replacingOccurrences(of: #"\n\s*\d+\.\s+"#, with: " ", options: .regularExpression)
+        cleanText = cleanText.replacingOccurrences(of: #"^\s*\d+\.\s+"#, with: "", options: .regularExpression)
+        
+        // Remove code blocks
+        cleanText = cleanText.replacingOccurrences(of: #"```[^`]*```"#, with: "", options: .regularExpression)
+        cleanText = cleanText.replacingOccurrences(of: #"`([^`]+)`"#, with: "$1", options: .regularExpression)
+        
+        // Remove multiple newlines and replace with a single space
+        cleanText = cleanText.replacingOccurrences(of: #"\n+"#, with: " ", options: .regularExpression)
+        
+        // Remove multiple spaces
+        cleanText = cleanText.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
+        
+        // Remove leading/trailing whitespace
+        cleanText = cleanText.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // If text is still too long, create a more engaging summary
+        if cleanText.count > 150 {
+            // Try to find a good breakpoint (end of sentence or phrase)
+            let possibleBreakpoints = [". ", "! ", "? ", "; ", ": "]
+            var bestBreakpoint = 150
+            
+            for breakpoint in possibleBreakpoints {
+                if let range = cleanText.range(of: breakpoint, options: [], range: cleanText.startIndex..<cleanText.index(cleanText.startIndex, offsetBy: min(200, cleanText.count))), 
+                   range.upperBound.utf16Offset(in: cleanText) > 100 && range.upperBound.utf16Offset(in: cleanText) < 200 {
+                    bestBreakpoint = range.upperBound.utf16Offset(in: cleanText)
+                    break
+                }
+            }
+            
+            let endIndex = cleanText.index(cleanText.startIndex, offsetBy: min(bestBreakpoint, cleanText.count))
+            return String(cleanText[..<endIndex])
         }
+        
         return cleanText
     }
 } 

@@ -56,12 +56,15 @@ struct NewsDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                     
                     Text(newsItem.title)
-                        .font(.title)
+                        .font(.title2)
                         .fontWeight(.bold)
+                        .fixedSize(horizontal: false, vertical: true)
                     
-                    Text(newsItem.summary)
+                    Text(formattedSummary)
                         .font(.body)
                         .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 4)
                     
                     // Date information
                     Text("Published: \(formattedDate)")
@@ -111,7 +114,7 @@ struct NewsDetailView: View {
                 ShareLink(
                     item: newsItem.redditURL,
                     subject: Text(newsItem.title),
-                    message: Text(newsItem.summary)
+                    message: Text(formattedSummary)
                 )
             }
         }
@@ -120,6 +123,32 @@ struct NewsDetailView: View {
                 FullScreenMemeView(meme: meme)
             }
         }
+    }
+    
+    private var formattedSummary: String {
+        // Clean up the summary text for better display
+        var summary = newsItem.summary
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+        
+        // Remove markdown links [text](url)
+        summary = summary.replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression)
+        
+        // Remove URLs
+        summary = summary.replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
+        
+        // Remove markdown formatting
+        summary = summary.replacingOccurrences(of: #"\*\*([^*]+)\*\*"#, with: "$1", options: .regularExpression)
+        summary = summary.replacingOccurrences(of: #"\*([^*]+)\*"#, with: "$1", options: .regularExpression)
+        summary = summary.replacingOccurrences(of: #"__([^_]+)__"#, with: "$1", options: .regularExpression)
+        summary = summary.replacingOccurrences(of: #"_([^_]+)_"#, with: "$1", options: .regularExpression)
+        
+        // Replace multiple newlines with a single newline
+        summary = summary.replacingOccurrences(of: #"\n{2,}"#, with: "\n", options: .regularExpression)
+        
+        return summary.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     private var formattedDate: String {
