@@ -5,12 +5,16 @@ struct NewsDetailView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
     @State private var selectedMeme: Meme?
-    @State private var showingMemeDetail = false
+    @State private var isShowingFullScreenMeme = false
     
     private let columns = [
         GridItem(.flexible()),
         GridItem(.flexible())
     ]
+    
+    private var isRedditSource: Bool {
+        return newsItem.redditURL.absoluteString.contains("reddit.com")
+    }
     
     var body: some View {
         ScrollView {
@@ -37,8 +41,8 @@ struct NewsDetailView: View {
                             EmptyView()
                         }
                     }
-                    .frame(height: 250)
-                    .clipShape(Rectangle())
+                    .frame(height: 200)
+                    .clipped()
                 }
                 
                 VStack(alignment: .leading, spacing: 12) {
@@ -59,38 +63,48 @@ struct NewsDetailView: View {
                         .font(.body)
                         .foregroundColor(.secondary)
                     
-                    Link(destination: newsItem.redditURL) {
-                        Label("Read on Reddit", systemImage: "link")
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
+                    // Date information
+                    Text("Published: \(formattedDate)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 4)
+                    
+                    // Only show the Reddit link if it's from Reddit and has a valid URL
+                    if isRedditSource && newsItem.redditURL.absoluteString != "https://reddit.com" {
+                        Link(destination: newsItem.redditURL) {
+                            Label("View original source", systemImage: "link")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                        .padding(.top, 2)
                     }
-                    .padding(.top, 4)
                     
                     if !newsItem.relatedMemes.isEmpty {
-                        VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text("Related Memes")
                                 .font(.headline)
-                                .padding(.top)
+                                .padding(.top, 8)
                             
-                            LazyVGrid(columns: columns, spacing: 16) {
-                                ForEach(newsItem.relatedMemes) { meme in
-                                    MemeCell(meme: meme)
+                            LazyVGrid(columns: columns, spacing: 10) {
+                                ForEach(newsItem.relatedMemes, id: \.id) { meme in
+                                    MemeGridItem(meme: meme)
                                         .onTapGesture {
                                             selectedMeme = meme
-                                            showingMemeDetail = true
+                                            isShowingFullScreenMeme = true
                                         }
                                 }
                             }
                         }
                     } else {
-                        Text("No memes available")
+                        Text("No related memes available")
+                            .font(.subheadline)
                             .foregroundColor(.secondary)
-                            .padding(.top)
                     }
                 }
                 .padding()
             }
         }
+        .navigationTitle("News Detail")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -101,11 +115,18 @@ struct NewsDetailView: View {
                 )
             }
         }
-        .sheet(isPresented: $showingMemeDetail, content: {
+        .sheet(isPresented: $isShowingFullScreenMeme) {
             if let meme = selectedMeme {
-                MemeDetailView(meme: meme)
+                FullScreenMemeView(meme: meme)
             }
-        })
+        }
+    }
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: newsItem.publishedDate)
     }
     
     private var categoryColor: Color {
@@ -124,11 +145,11 @@ struct NewsDetailView: View {
     }
 }
 
-struct MemeCell: View {
+struct MemeGridItem: View {
     let meme: Meme
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack {
             AsyncImage(url: meme.imageURL) { phase in
                 switch phase {
                 case .empty:
@@ -150,84 +171,125 @@ struct MemeCell: View {
                     EmptyView()
                 }
             }
-            .frame(height: 150)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(radius: 2)
+            .frame(height: 120)
+            .cornerRadius(8)
+            .clipped()
             
             if let title = meme.title {
                 Text(title)
                     .font(.caption)
-                    .lineLimit(2)
-                    .foregroundColor(.primary)
-                    .padding(.horizontal, 4)
+                    .lineLimit(1)
             }
         }
     }
 }
 
-struct MemeDetailView: View {
+struct FullScreenMemeView: View {
     let meme: Meme
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 16) {
+            GeometryReader { geometry in
+                ZStack {
+                    Color.black.edgesIgnoringSafeArea(.all)
+                    
                     AsyncImage(url: meme.imageURL) { phase in
                         switch phase {
                         case .empty:
                             ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(.white)
                         case .success(let image):
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
+                                .scaleEffect(scale)
+                                .offset(offset)
+                                .gesture(
+                                    MagnificationGesture()
+                                        .onChanged { value in
+                                            let delta = value / lastScale
+                                            lastScale = value
+                                            scale = min(max(scale * delta, 1), 4)
+                                        }
+                                        .onEnded { _ in
+                                            lastScale = 1.0
+                                        }
+                                )
+                                .gesture(
+                                    DragGesture()
+                                        .onChanged { value in
+                                            if scale > 1 {
+                                                offset = CGSize(
+                                                    width: lastOffset.width + value.translation.width,
+                                                    height: lastOffset.height + value.translation.height
+                                                )
+                                            }
+                                        }
+                                        .onEnded { _ in
+                                            lastOffset = offset
+                                            
+                                            // Reset position if scale is back to 1
+                                            if scale <= 1 {
+                                                withAnimation {
+                                                    offset = .zero
+                                                    lastOffset = .zero
+                                                }
+                                            }
+                                        }
+                                )
+                                .onTapGesture(count: 2) {
+                                    withAnimation {
+                                        if scale > 1 {
+                                            scale = 1
+                                            offset = .zero
+                                            lastOffset = .zero
+                                        } else {
+                                            scale = 2
+                                        }
+                                    }
+                                }
                         case .failure:
-                            Image(systemName: "photo")
-                                .foregroundColor(.gray)
+                            VStack {
+                                Image(systemName: "photo")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.white)
+                                Text("Failed to load image")
+                                    .foregroundColor(.white)
+                            }
                         @unknown default:
                             EmptyView()
                         }
                     }
-                    .frame(maxWidth: .infinity)
-                    
-                    if let title = meme.title {
-                        Text(title)
-                            .font(.headline)
-                            .multilineTextAlignment(.center)
-                    }
-                    
-                    Button(action: {
-                        openURL(meme.redditURL)
-                    }) {
-                        Label("View on Reddit", systemImage: "link")
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
-                .padding()
             }
             .navigationBarTitleDisplayMode(.inline)
-            .navigationTitle("Meme")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
                         dismiss()
                     }
+                    .foregroundColor(.white)
                 }
                 
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     ShareLink(
                         item: meme.imageURL,
                         subject: Text(meme.title ?? "Shared Meme"),
                         message: Text("Check out this meme!")
                     )
+                    .foregroundColor(.white)
                 }
             }
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(Color.black.opacity(0.6), for: .navigationBar)
         }
+        .preferredColorScheme(.dark)
     }
 } 

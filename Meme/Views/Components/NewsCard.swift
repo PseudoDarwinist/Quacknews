@@ -3,9 +3,14 @@ import SwiftUI
 struct NewsCard: View {
     let newsItem: NewsItem
     
+    // Keep this property for internal use but don't display the badge
+    private var isRedditSource: Bool {
+        return newsItem.redditURL.absoluteString.contains("reddit.com")
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Category Badge
+            // Category Badge (without source badge)
             Text(newsItem.category.rawValue)
                 .font(.caption)
                 .fontWeight(.bold)
